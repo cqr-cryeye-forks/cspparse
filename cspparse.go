@@ -14,6 +14,8 @@ Contributor(s):
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -34,16 +36,26 @@ func main() {
 
 		// Validate the given URL
 		_, err := url.ParseRequestURI(domain)
-
+		fmt.Println(err)
 		if err != nil {
-			fmt.Println("Domain must be a valid URL")
+			m := make(map[string]string)
+			m["exception"] = "Domain must be a valid URL"
+			message, _ := json.MarshalIndent(m, "", "    ")
+			fmt.Println(string(message))
+			_ = ioutil.WriteFile("output.json", message, 0777)
+			fmt.Println(errors.Wrap(err, string(message)))
 			os.Exit(1)
 		}
 
 		cspObject, err = getCSPMap(domain)
 
 		if err != nil {
-			fmt.Println(errors.Wrap(err, "could not retrieve CSP Information"))
+			m := make(map[string]string)
+			m["exception"] = "Could not retrieve CSP Information"
+			message, _ := json.MarshalIndent(m, "", "    ")
+			fmt.Println(string(message))
+			_ = ioutil.WriteFile("output.json", message, 0777)
+			fmt.Println(errors.Wrap(err, string(message)))
 			os.Exit(1)
 		}
 
@@ -51,11 +63,20 @@ func main() {
 		cspObjectsBytes, err = json.MarshalIndent(cspObject, "", "    ")
 
 		if err != nil {
-			fmt.Println(errors.Wrap(err, "error formatting output JSON"))
+			m := make(map[string]string)
+			m["exception"] = "Error formatting output JSON"
+			message, _ := json.MarshalIndent(m, "", "    ")
+			fmt.Println(string(message))
+			_ = ioutil.WriteFile("output.json", message, 0777)
+			fmt.Println(errors.Wrap(err, string(message)))
 			os.Exit(1)
 		}
 
 		// Print it to the user
+		err = ioutil.WriteFile("output.json", cspObjectsBytes, 0777)
+		if err != nil {
+			log.Fatal(err)
+		}
 		fmt.Println(string(cspObjectsBytes))
 	} else {
 		// if no domain or url is passed show the usage to the user.
@@ -120,6 +141,16 @@ func getCSPHtml(domain string, cspObject map[string]interface{}) error {
 	client := &http.Client{Timeout: 3 * time.Second}
 
 	resp, err := client.Get(domain)
+
+	if err != nil {
+		m := make(map[string]string)
+		m["exception"] = err.Error()
+		message, _ := json.MarshalIndent(m, "", "    ")
+		fmt.Println(string(message))
+		_ = ioutil.WriteFile("output.json", message, 0777)
+		fmt.Println(errors.Wrap(err, string(message)))
+		os.Exit(1)
+	}
 
 	doc, err := goquery.NewDocumentFromReader(resp.Body)
 
